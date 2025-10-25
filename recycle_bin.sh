@@ -38,7 +38,7 @@ log_message() {
 #################################################
 initialize_recyclebin() {
     #Verify if the directory of the recycle_bin exists:
-    if [ ! -d "$RECYCLE_BIN_DIR"]; then
+    if [ ! -d "$RECYCLE_BIN_DIR" ]; then
         #Criar a estrutura de diretórios caso não exista e cria o diretório onde irão ser armazenados os ficheiros deletados:
         mkdir -p "$FILES_DIR"
 
@@ -75,10 +75,9 @@ initialize_recyclebin() {
 # Returns: Prints unique ID to stdout
 #################################################
 generate_unique_id() {
-local timestamp=$(date +%s)
-local random=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -
-n 1)
-echo "${timestamp}_${random}"
+    local timestamp=$(date +%s)
+    local random=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
+    echo "${timestamp}_${random}"
 }
 
 #################################################
@@ -100,15 +99,56 @@ delete_file(){
     echo -e "${RED}Error: File '$file_path' does not exist${NC}"
     return 1
     fi
-    # Your code here
+
     # Hint: Get file metadata using stat command
+    local filename=$(basename "$file_path") #filename fica com o valor do nome do arquivo
+    local original_path=$(realpath "$file_path") #original_path fica com o valor do caminho absoluto do arquivo
+    local deletion_date=$(date '+%Y-%m-%d %H:%M:%S')  #deletion_date fica com o valor da data e hora em que o arquivo foi eliminado
+    local file_size=$(stat -c "%s" "$file_path" || echo "0") #file_size fica com o valor do tamanho do arquivo em bytes, caso stat falhe fica com o valor "0"
+    local permissions=$(stat -c "%a" "$file_path" || echo "erro ao obter as permissões do arquivo")  #permissions  fica com o valor das permissões do arquivo, caso stat falhe fica com o valor "erro ao obter as permissões do arquivo"
+    local owner=$(stat -c "%U:%G" "$file_path" || echo "user_name:group_name") #owner fica com o valor do user:group_name, caso stat falhe fica com o valor "user_name:group_name"
+    
+    # Determine file type
+    local file_type="file"
+    if [ -d "$file_path" ]; then
+        file_type="directory"
+        # For directories, get total size including contents
+        file_size=$(du -sb "$file_path" | cut -f1 || echo "0") #du calcula o tamanho (mostra o tamanho total, ou seja se for uma pasta não mostra o tamanho de cada ficheiro em separado mas sim o tamanho total da pasta, isto graças a usar -sb (summarybytes)), cut extrai o número e a variável recebe o valor calculado por du e extraido por cut
+    fi
+
     # Hint: Generate unique ID
+    local unique_id=$(generate_unique_id) #chama a função para gerar um novo id único
+
     # Hint: Move file to FILES_DIR with unique ID
+    if mv "$file_path" "$FILES_DIR/$unique_id";  then
+    echo -e "${GREEN} Successfully moved to recycle bin: $filename${NC}"
+
     # Hint: Add entry to metadata file
+    echo "$unique_id,$filename,$original_path,$deletion_date,$file_size,$file_type,$permissions,$owner" >> "$METADATA_FILE"
+        
+        # Log the operation
+        log_message "Deleted: $filename (ID: $unique_id) from $original_path"
+        
+        echo -e "${BLUE}File ID: $unique_id${NC}"
+        echo -e "${BLUE}Original location: $original_path${NC}"
+        return 0
+    else
+        echo -e "${RED}Error: Failed to move '$filename' to recycle bin${NC}"
+        log_message "Failed to delete: $filename from $original_path"
+        return 1
+    fi
+    
+    
     echo "Delete function called with: $file_path"
     return 0
 }
 
+#################################################
+# Function: restore_file
+# Description: Restores file from recycle bin
+# Parameters: $1 - unique ID of file to restore
+# Returns: 0 on success, 1 on failure
+#################################################
 restore_file(){
     # TODO: Implement this function
     local file_id="$1"
@@ -116,8 +156,14 @@ restore_file(){
     echo -e "${RED}Error: No file ID specified${NC}"
     return 1
     fi
-    # Your code here
+
     # Hint: Search metadata for matching ID
+    local entry=$(grep "^$file_id," "$METADATA_FILE")
+    if [ -z "$entry" ]; then
+        echo -e "${RED}Error: File with ID '$file_id' not found in recycle bin${NC}"
+        return 1
+    fi
+    
     # Hint: Get original path from metadata
     # Hint: Check if original path exists
     # Hint: Move file back and restore permissions
