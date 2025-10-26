@@ -153,21 +153,72 @@ restore_file(){
     # TODO: Implement this function
     local file_id="$1"
     if [ -z "$file_id" ]; then
-    echo -e "${RED}Error: No file ID specified${NC}"
-    return 1
+        echo -e "${RED}Error: No file ID specified${NC}"
+        return 1
     fi
 
     # Hint: Search metadata for matching ID
-    local entry=$(grep "^$file_id," "$METADATA_FILE")
-    if [ -z "$entry" ]; then
+    local entry=$(grep "^$file_id," "$METADATA_FILE") #procura a linha que começa com o file_id em METADATA_FILE
+    if [ -z "$entry" ]; then #Verifica se foi encontrada alguma coisa ou se o tamanho da variável entry é 0
         echo -e "${RED}Error: File with ID '$file_id' not found in recycle bin${NC}"
         return 1
     fi
+
+    #Hint: Get original path from metadata
+    IFS=',' read -ra campos <<< "$entry"
+    #Atribuição de variáveis
+    local id="${campos[0]}"
+    local original_name="${campos[1]}"
+    local original_path="${campos[2]}"
+    local deletion_date="${campos[3]}"
+    local file_size="${campos[4]}"
+    local file_type="${campos[5]}"
+    local permissions="${campos[6]}"
+    local owner="${campos[7]}"
+
     
-    # Hint: Get original path from metadata
-    # Hint: Check if original path exists
-    # Hint: Move file back and restore permissions
-    # Hint: Remove entry from metadata
+    #Hint: Check if original path exists
+    if [ ! -e "$FILES_DIR/$file_id" ]; then  # Verifica se o arquivo físico ainda existe no diretório files/ do recycle bin
+        echo -e "${RED}Error: File '$original_name' not found in recycle bin files${NC}"
+        return 1
+    fi
+
+    # Check if original directory exists, create if needed
+    local parent_dir=$(dirname "$original_path") # Extrai o diretório pai do caminho original (remove o nome do arquivo)
+    if [ ! -d "$parent_dir" ]; then  # Verifica se o diretório pai existe
+        echo -e "${YELLOW}Original directory doesn't exist. Creating: $parent_dir${NC}"
+        mkdir -p "$parent_dir" # Cria o diretório recursivamente (-p)
+    fi
+
+    # Check if file already exists at destination
+    if [ -e "$original_path" ]; then # Verifica se já existe um arquivo no local de restauração
+        echo -e "${YELLOW}File already exists at: $original_path${NC}"
+        read -p "Overwrite? (y/n): " -n 1 -r # Pede confirmação (-n 1: lê apenas 1 char)
+        echo # Quebra de linha após a resposta
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then # Verifica se a resposta NÃO foi Y ou y
+            echo "Restore cancelled"
+            return 1
+        fi
+    fi
+
+    #Hint: Move file back and restore permissions
+    if mv "$FILES_DIR/$file_id" "$original_path"; then # Move o arquivo do recycle bin de volta para o local original
+        # Restore original permissions
+        chmod "$permissions" "$original_path" # Restaura as permissões originais
+        
+        #Hint: Remove entry from metadata
+        grep -v "^$file_id," "$METADATA_FILE" > "$METADATA_FILE.tmp" # grep -v: mostra tudo EXCETO as linhas que começam com file_id e redireciona para um arquivo temporário 
+        mv "$METADATA_FILE.tmp" "$METADATA_FILE" # Substitui o arquivo original pelo temporário
+        
+        echo -e "${GREEN} Successfully restored: $original_name${NC}"
+        echo -e "${BLUE}Restored to: $original_path${NC}"
+        log_message "Restored: $original_name to $original_path" # Registra no log
+        return 0
+    else
+        echo -e "${RED}Error: Failed to restore '$original_name'${NC}"
+        log_message "Failed to restore: $original_name to $original_path"
+        return 1
+    fi
 
     return 0
 }
