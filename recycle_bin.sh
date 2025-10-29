@@ -18,6 +18,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+
 #################################################
 # Function: log_message
 # Description: Logs messages to log file
@@ -58,6 +59,7 @@ initialize_recyclebin() {
     return 0
 }
 
+
 #################################################
 # Function: generate_unique_id
 # Description: Generates unique ID for deleted files
@@ -69,6 +71,7 @@ generate_unique_id() {
     local random=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
     echo "${timestamp}_${random}"
 }
+
 
 #################################################
 # Function: delete_file
@@ -110,6 +113,7 @@ delete_file() {
 
     return $((fail_count > 0))
 }
+
 
 #################################################
 # Function: delete_single_file
@@ -215,6 +219,7 @@ delete_single_file() {
         return 1
     fi
 }
+
 
 #################################################
 # Function: restore_file
@@ -372,9 +377,9 @@ restore_file() {
         if grep -v "^$id," "$METADATA_FILE" > "${METADATA_FILE}.tmp" && \
            mv "${METADATA_FILE}.tmp" "$METADATA_FILE"; then
             # Provide restoration feedback
-            echo -e "${GREEN}✓ Successfully restored: $original_name${NC}"
+            echo -e "${GREEN} Successfully restored: $original_name${NC}"
             if [ "$restore_path" != "$original_path" ]; then
-                echo -e "${GREEN}✓ File renamed to: $(basename "$restore_path")${NC}"
+                echo -e "${GREEN} File renamed to: $(basename "$restore_path")${NC}"
             fi
             echo -e "${BLUE}Location: $restore_path${NC}"
             
@@ -393,6 +398,7 @@ restore_file() {
         return 1
     fi
 }
+
 
 #################################################
 # Function: list_recycled
@@ -431,6 +437,7 @@ list_recycled() {
 
     return 0
 }
+
 
 #################################################
 # Function: list_normal_view
@@ -506,6 +513,7 @@ list_normal_view() {
     echo -e "${GREEN}Total items: $item_count${NC}"
     echo -e "${GREEN}Total storage used: $display_total_size${NC}"
 }
+
 
 #################################################
 # Function: list_detailed_view
@@ -602,6 +610,7 @@ list_detailed_view() {
     fi
 }
 
+
 #################################################
 # Function: empty_recyclebin
 # Description: Permanently deletes all items or specific item by ID
@@ -681,6 +690,7 @@ empty_recyclebin() {
     return 0
 }
 
+
 #################################################
 # Function: empty_specific_file
 # Description: Permanently deletes a specific file by ID
@@ -752,6 +762,7 @@ empty_specific_file() {
         return 1
     fi
 }
+
 
 #################################################
 # Function: search_recycled
@@ -829,6 +840,7 @@ search_recycled() {
 
     return 0
 }
+
 
 #################################################
 # Function: display_help
