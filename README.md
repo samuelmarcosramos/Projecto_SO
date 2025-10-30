@@ -62,7 +62,7 @@ Nº Mecanográfico: 124955
 
 ## Examples
 -->Inicialização:
-    ![Inicialização](Readme_images/inicialização.png)
+    ![Inicialização](Readme_images/inicializacao.png)
 
 -->Delete_File (Suporta múltiplos files de uma vez):
     ![Delete](Readme_images/delete_file.png)
