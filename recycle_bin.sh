@@ -21,11 +21,11 @@ NC='\033[0m' # No Color
 
 #################################################
 # Function: log_message
-# Description: Logs messages to log file
+# Description: Logs messages to log file    
 # Parameters: $1 - message to log
 # Returns: None
 #################################################
-log_message() {
+log_message(){
     local message="$1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >> "$LOG_FILE" #Dá append ao arquivo log.txt da data e hora do log e da mensagem
 }
@@ -37,31 +37,37 @@ log_message() {
 # Parameters: None
 # Returns: 0 on success, 1 on failure
 #################################################
-initialize_recyclebin() {
-    #Confirmação se o diretório RECYCLE_BIN_DIR ($HOME/.recycle_bin) existe
-    if [ ! -d "$RECYCLE_BIN_DIR" ]; then #Caso não exista:
+initialize_recyclebin(){
+    # Confirmação se o diretório RECYCLE_BIN_DIR ($HOME/.recycle_bin) existe
+    if [ ! -d "$RECYCLE_BIN_DIR" ]; then # Caso não exista:
 
-        #Criação do diretório FILES_DIR ($RECYCLE_BIN_DIR/ficheiros) e dos seus parentes ($HOME/.recycle_bin):
+        # Criação do diretório FILES_DIR ($RECYCLE_BIN_DIR/ficheiros) e dos seus parentes ($HOME/.recycle_bin):
         mkdir -p "$FILES_DIR"
+        echo -e "${GREEN}Created directory: $FILES_DIR${NC}"
 
-        #Criação do ficheiro metadata.db
+        # Criação do ficheiro metadata.db
         echo "ID,ORIGINAL_NAME,ORIGINAL_PATH,DELETION_DATE,FILE_SIZE,FILE_TYPE,PERMISSIONS,OWNER" > "$METADATA_FILE"
+        echo -e "${GREEN}Created metadata file: $METADATA_FILE${NC}"
         
-        #Criação do ficheiro log.txt
+        # Criação do ficheiro log.txt
         touch "$LOG_FILE"
+        echo -e "${GREEN}Created log file: $LOG_FILE${NC}"
 
-        #Criação do ficheiro config
+        # Criação do ficheiro config
         echo "MAX_SIZE_MB=$MAX_SIZE_MB" > "$CONFIG_FILE"
         echo "RETENTION_DAYS=$RETENTION_DAYS" >> "$CONFIG_FILE"
+        echo -e "${GREEN}Created config file: $CONFIG_FILE${NC}"
 
-        #Mensagem adicionada ao log.txt
+        # Mensagem adicionada ao log.txt
         log_message "Recycle bin initialized"
 
-        #Saída a confirmar o sucesso da ação
-        echo -e "${GREEN} Recycle bin initialized at $RECYCLE_BIN_DIR${NC}"
+        # Saída a confirmar o sucesso da ação
+        echo -e "${GREEN}Recycle bin initialized at $RECYCLE_BIN_DIR${NC}"
+        return 0
+    else
+        echo -e "${YELLOW}Recycle bin already exists at $RECYCLE_BIN_DIR${NC}"
         return 0
     fi
-    return 0
 }
 
 
@@ -71,9 +77,11 @@ initialize_recyclebin() {
 # Parameters: None
 # Returns: Prints unique ID to stdout
 #################################################
-generate_unique_id() {
-    local timestamp=$(date +%s)
-    local random=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
+generate_unique_id(){
+    local timestamp
+    local random
+    timestamp=$(date +%s)
+    random=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)
     echo "${timestamp}_${random}"
 }
 
@@ -84,7 +92,7 @@ generate_unique_id() {
 # Parameters: $1 - path to file/directory (supports multiple files)
 # Returns: 0 on success, 1 on failure
 #################################################
-delete_file() {
+delete_file(){
     local success_count=0
     local fail_count=0
 
@@ -142,7 +150,7 @@ delete_file() {
 # Parameters: $1 - path to file/directory
 # Returns: 0 on success, 1 on failure
 #################################################
-delete_single_file() {
+delete_single_file(){
     local file_path="$1"
 
     # Verifica se existem argumentos
@@ -164,8 +172,10 @@ delete_single_file() {
     fi
 
     # Obtém os caminhos absolutos do ficheiro que o user está a tentar eliminar e do recycle bin, para realizar verificações
-    local original_path=$(realpath "$file_path" || echo "$file_path")
-    local recycle_bin_path=$(realpath "$RECYCLE_BIN_DIR")
+    local original_path
+    local recycle_bin_path
+    original_path=$(realpath "$file_path" || echo "$file_path")
+    recycle_bin_path=$(realpath "$RECYCLE_BIN_DIR")
     
     # Verifica se o utilizador está a tentar eliminar o recycle bin ou algum subdiretório
     if [ "$original_path" = "$recycle_bin_path" ] || [[ "$original_path" == "$recycle_bin_path"/* ]]; then #Caso esteja:
@@ -196,7 +206,7 @@ delete_single_file() {
         return 1
     fi
 
-    # Verificação se o user tem permissão de escrita no diretório (Só é possivel mover (mv) um diretório se o user tiver permissão de escrita nesse diretório)
+    # Verifica se o user tem permissão de escrita no diretório (Só é possivel mover (mv) um diretório se o user tiver permissão de escrita nesse diretório)
     if [ -d "$original_path" ] && [ ! -w "$original_path" ]; then
 
         #Mensagem de erro a informar que a açao não pode ser concluida devido a não ter permissão de escrita no diretório
@@ -205,13 +215,15 @@ delete_single_file() {
         return 1
     fi
 
-    # Verificação se existe espaço suficiente no recycle bin
+    # Verifica se existe espaço suficiente no recycle bin
     
-    local file_size=$(du -sb "$file_path" | awk '{print $1}') #Tamanho do ficheiro ou diretório em bytes
+    local file_size
+    file_size=$(du -sb "$file_path" | awk '{print $1}') #Tamanho do ficheiro ou diretório em bytes
 
     local max_size_bytes=$((MAX_SIZE_MB * 1024 * 1024)) #Tamanho máximo do recycle bin convertido para bytes
 
-    local current_usage=$(du -sb "$FILES_DIR" | awk '{print $1}') #Tamanho atual que os ficheiros ocupam atualmente
+    local current_usage
+    current_usage=$(du -sb "$FILES_DIR" | awk '{print $1}') #Tamanho atual que os ficheiros ocupam atualmente
 
     local available_space=$((max_size_bytes-current_usage)) #Obtém o o espaço disponível (primeira linha)
 
@@ -225,11 +237,16 @@ delete_single_file() {
     fi
 
     # Obtém os metadata
-    local filename=$(basename "$file_path")
-    local abs_path=$(realpath "$file_path")
-    local permissions=$(stat -c %a "$file_path")
-    local owner=$(stat -c %U:%G "$file_path")
-    local deletion_date=$(date "+%Y-%m-%d %H:%M:%S")
+    local filename
+    local abs_path
+    local permissions
+    local owner
+    local deletion_date
+    filename=$(basename "$file_path")
+    abs_path=$(realpath "$file_path")
+    permissions=$(stat -c %a "$file_path")
+    owner=$(stat -c %U:%G "$file_path")
+    deletion_date=$(date "+%Y-%m-%d %H:%M:%S")
 
     
     # Determina o tipo de ficheiro por defeito:
@@ -243,7 +260,8 @@ delete_single_file() {
     fi
 
     # Gera um ID único para cada item eliminado
-    local unique_id=$(generate_unique_id)
+    local unique_id
+    unique_id=$(generate_unique_id)
 
     # Mensagem a confirmar que os ficheiros irão ser movidos para o $FILES_DIR com um ID único
     echo -e "${YELLOW}Moving '$filename' to recycle bin...${NC}"
@@ -284,10 +302,10 @@ delete_single_file() {
 # Parameters: $1 - unique ID or filename of file to restore
 # Returns: 0 on success, 1 on failure
 #################################################
-restore_file() {
+restore_file(){
     local search_term="$1" # Aceita filename ou ID para restaurar
     
-    # Verifica se existe algum argumento
+    #Verifica se existe algum argumento
     if [ -z "$search_term" ]; then #Caso não exista:
 
         #Mensagem de erro a identificar o erro
@@ -296,23 +314,23 @@ restore_file() {
         return 1
     fi
 
-    # Procura na metadata uma entrada que coincida com o argumento
+    #Procura na metadata uma entrada que coincida com o argumento
     local entry #variável de entrada
 
     #Verifica se o argumento é um ID utilizando regex "[[]]"
     if [[ "$search_term" =~ ^[0-9]+_[a-z0-9]+$ ]]; then #Caso seja:
 
-        # Procura por ID
+        #Procura por ID
         entry=$(grep "^$search_term," "$METADATA_FILE")
 
     else #Caso contrário
 
-        # Procura por filename (case-insensitive)
+        #Procura por filename (case-insensitive)
         entry=$(grep -i ",$search_term," "$METADATA_FILE")
         
     fi
 
-    # Verifica se o ID ou o filename não foi encontrado
+    #Verifica se o ID ou o filename não foi encontrado
     if [ -z "$entry" ]; then #Caso não tenha sido encontrado:
 
         #Mensagem de erro a explicar o erro
@@ -321,14 +339,18 @@ restore_file() {
         return 1
     fi
 
-    # Divide pelos campos de metadata a entry
+    #Divide pelos campos de metadata a entry
     IFS=',' read -r id original_name original_path deletion_date file_size file_type permissions owner <<< "$entry" #Entry é passado como input ao comando read que divide cada campo por virgulas
 
-    # Verifica, caso o user tentar o restauro através do filename, se existe mais do que um ficheiro com o mesmo nome
+    #Path original
+    local restore_path="$original_path/$original_name"
+
+    #Verifica, caso o user tentar o restauro através do filename, se existe mais do que um ficheiro com o mesmo nome
     if [[ ! "$search_term" =~ ^[0-9]+_[a-z0-9]+$ ]]; then #Caso o user tente o restauro do ficheiro por filename:
 
         #Conta o número de linhas (ficheiros com o mesmo nome (case insensitive))
-        local match_count=$(grep -i ",$original_name," "$METADATA_FILE" | wc -l)
+        local match_count
+        match_count=$(grep -c -i ",$original_name," "$METADATA_FILE")
 
         #Verifica se existe mais do que um ficheiro com o mesmo nome
         if [ "$match_count" -gt 1 ]; then #Caso exista:
@@ -343,7 +365,7 @@ restore_file() {
 
     fi
 
-    # Verifica se o ficheiro existe no recycle bin
+    #Verifica se o ficheiro existe no recycle bin
     if [ ! -e "$FILES_DIR/$id" ]; then #Caso não exista:
 
         #Mensagem de erro a infromar que o ficehiro não se encontra no recycle bin
@@ -352,16 +374,17 @@ restore_file() {
         return 1
     fi
 
-    # Conflitos ao restaurar:
+    #Conflitos ao restaurar:
     
     # 1 - Se o path orginal já não existir, criar diretório 
-    # Obter o diretório pai do ficheiro/diretório
-    local parent_dir=$(dirname "$original_path")
+    #Obter o diretório pai do ficheiro/diretório
+    local parent_dir
+    parent_dir=$(dirname "$restore_path")
 
     #Verifica se o diretório existe
     if [ ! -d "$parent_dir" ]; then #Caso não exista.
 
-        # Mensagem a informar que o diretório vai ser criado
+        #Mensagem a informar que o diretório vai ser criado
         echo -e "${YELLOW}Original directory doesn't exist. Creating: $parent_dir${NC}"
 
         #Tenta criar o diretório e verifica se o comando foi bem sucedido
@@ -384,7 +407,8 @@ restore_file() {
     fi
 
     # 3 - Verifica problemas com o espaço
-    local available_space=$(df "$parent_dir" | awk 'NR==2 {print $4}') #Obtém o espaço disponível no diretório pai
+    local available_space
+    available_space=$(df "$parent_dir" | awk 'NR==2 {print $4}') #Obtém o espaço disponível no diretório pai
 
     #Verifica se o tamanho do ficheiro é superior ao espaço disponível
     if [ "$file_size" -gt "$available_space" ]; then #Caso seja:
@@ -400,7 +424,6 @@ restore_file() {
 
     # 4 - Se o ficheiro já existir no original path, perguntar ao user o que fazer
     #Variável que irá ter o novo caminho
-    local restore_path
 
     #Variável que permite confirmar quando o problema é resolvido
     local conflict_resolved=false
@@ -421,7 +444,7 @@ restore_file() {
         while [ "$conflict_resolved" = false ]; do
 
             #Lê o input do user e armazena-o em choice
-            read -p "Enter your choice (1-3): " choice
+            read -r -p "Enter your choice (1-3): " choice
             
             case $choice in
                 #Caso choice = 1
@@ -457,7 +480,8 @@ restore_file() {
                     local extension="${original_name##*.}"
 
 
-                    local timestamp=$(date +%Y%m%d_%H%M%S)
+                    local timestamp
+                    timestamp=$(date +%Y%m%d_%H%M%S)
                     
                     if [ "$extension" = "$original_name" ]; then
                         # No extension
@@ -489,9 +513,14 @@ restore_file() {
                     ;;
             esac
         done
+    else
+        
+        #Se não há conflito, conflict_resolved=true
+        conflict_resolved=true
+
     fi
 
-    # Restaura o ficheiro com o caminho absoluto original
+    #Restaura o ficheiro com o caminho absoluto original
     echo -e "${YELLOW}Restoring: $original_name${NC}"
     echo -e "${BLUE}From: $FILES_DIR/$id${NC}"
     echo -e "${BLUE}To: $restore_path${NC}"
@@ -499,7 +528,7 @@ restore_file() {
     #Verifica se o comando foi bem sucedido
     if mv "$FILES_DIR/$id" "$restore_path"; then #Caso seja:
 
-        # Restaura as permissões originais usando chmod
+        #Restaura as permissões originais usando chmod
         #Verifica se o comando é bem sucedido
         if ! chmod "$permissions" "$restore_path"; then #Caso não seja:
 
@@ -507,7 +536,7 @@ restore_file() {
             echo -e "${YELLOW}Warning: Could not restore original permissions${NC}"
         fi
 
-        # Remover entry de metadata.db depois da restauração ter sido bem sucedida
+        #Remover entry de metadata.db depois da restauração ter sido bem sucedida
         #A linha do METADATA_FILE que contém a informação do id do ficheiro que vai ser restaurado é eliminada e as restantes linhas são guardadas num ficheiro temporário, depois caso este primeiro comando seja bem sucedido, o metadata.db é atualizado, para além disso verifica se os comandos foram bem sucedidos
         if grep -v "^$id," "$METADATA_FILE" > "${METADATA_FILE}.tmp" && mv "${METADATA_FILE}.tmp" "$METADATA_FILE"; then #Caso sejam bem sucedidos:
             
@@ -519,6 +548,8 @@ restore_file() {
             log_message "Restored: $original_name to $restore_path (ID: $id)"
 
             return 0
+        fi
+
     else #Caso o comando de restauração falhe:
 
         #Mensagem de erro a informar da falha da operação
@@ -538,7 +569,7 @@ restore_file() {
 # Parameters: None
 # Returns: 0 on success
 #################################################
-list_recycled() {
+list_recycled(){
 
     #Variável que permite saber se o user quer ver a lista com detalhe 
     local detailed_mode=0
@@ -561,7 +592,8 @@ list_recycled() {
     fi
 
     #Conta o número de linhas em metadata
-    local line_count=$(wc -l < "$METADATA_FILE")
+    local line_count
+    line_count=$(wc -l < "$METADATA_FILE")
     
     #Calcula o número de itens (subtrai a linha do cabeçalho)
     local item_count=$((line_count - 1))
@@ -596,12 +628,17 @@ list_recycled() {
 # Parameters: None
 # Returns: 0 on success
 #################################################
-list_normal_view() {
+list_normal_view(){
     #Variável tamanho total
     local total_size=0
 
     #Contagem do nº de items
     local item_count=0
+    
+    #Size
+    local KB=1024
+    local MB=$((1024 * 1024))
+    local GB=$((1024 * 1024 * 1024))
     
     #Título
     echo " Recycle Bin Items"
@@ -635,25 +672,25 @@ list_normal_view() {
             display_date="${deletion_date:0:16}"
             
             #Formato simples do tamanho
-            if [ "$file_size" -lt 1024 ]; then #Caso o tamanho seja menor que 1KB:
+            if [ "$file_size" -lt "$KB" ]; then #Caso o tamanho seja menor que 1KB:
             
                 #Mostra o tamanho em bytes
                 display_size="${file_size}B"
                 
-            elif [ "$file_size" -lt 1024 * 1024 ]; then #Caso o tamanho seja menor que 1MB:
+            elif [ "$file_size" -lt "$MB" ]; then #Caso o tamanho seja menor que 1MB:
             
                 #Converte para KB e mostra
-                display_size="$((file_size / 1024))KB"
+                display_size="$((file_size / KB))KB"
                 
-            elif [ "$file_size" -lt 1024 * 1024 * 1024 ]; then #Caso o tamanho seja menor que 1GB:
+            elif [ "$file_size" -lt "$GB" ]; then #Caso o tamanho seja menor que 1GB:
             
                 #Converte para MB e mostra
-                display_size="$((file_size / 1024 / 1024))MB"
+                display_size="$((file_size / MB))MB"
                 
             else #Caso o tamanho seja maior ou igual a 1GB:
             
                 #Converte para GB e mostra
-                display_size="$((file_size / 1024 / 1024 / 1024))GB"
+                display_size="$((file_size / GB))GB"
             fi
             
             #Mostra a linha formatada da tabela
@@ -675,21 +712,21 @@ list_normal_view() {
     local display_total_size
     
     #Verifica o tamanho total e formata
-    if [ "$total_size" -lt 1024 ]; then #Caso seja menor que 1KB:
+    if [ "$total_size" -lt "$KB" ]; then #Caso seja menor que 1KB:
     
         display_total_size="${total_size}B"
         
-    elif [ "$total_size" -lt 1024 * 1024 ]; then #Caso seja menor que 1MB:
+    elif [ "$total_size" -lt "$MB" ]; then #Caso seja menor que 1MB:
     
-        display_total_size="$((total_size / 1024))KB"
+        display_total_size="$((total_size / KB))KB"
         
-    elif [ "$total_size" -lt 1024 * 1024 * 1024 ]; then #Caso seja menor que 1GB:
+    elif [ "$total_size" -lt "$GB" ]; then #Caso seja menor que 1GB:
     
-        display_total_size="$((total_size / 1024 / 1024))MB"
+        display_total_size="$((total_size / MB))MB"
         
     else #Caso seja maior ou igual a 1GB:
     
-        display_total_size="$((total_size / 1024 / 1024 / 1024))GB"
+        display_total_size="$((total_size / GB))GB"
     fi
     
     #Mostra totais finais
@@ -704,7 +741,7 @@ list_normal_view() {
 # Parameters: None
 # Returns: 0 on success
 #################################################
-list_detailed_view() {
+list_detailed_view(){
     #Variável tamanho total
     local total_size=0
 
@@ -716,6 +753,11 @@ list_detailed_view() {
     
     #Contagem de diretórios
     local dir_count=0
+
+    #Size
+    local KB=1024
+    local MB=$((1024 * 1024))
+    local GB=$((1024 * 1024 * 1024))
     
     #Título
     echo " Recycle Bin Items (Detailed View)"
@@ -752,21 +794,21 @@ list_detailed_view() {
             local display_size
             
             #Verifica o tamanho do ficheiro e formata apropriadamente
-            if [ "$file_size" -lt 1024 ]; then #Caso seja menor que 1KB:
+            if [ "$file_size" -lt "$KB" ]; then #Caso seja menor que 1KB:
             
                 display_size="${file_size} bytes"
                 
-            elif [ "$file_size" -lt 1024 * 1024 ]; then #Caso seja menor que 1MB:
+            elif [ "$file_size" -lt "$MB" ]; then #Caso seja menor que 1MB:
             
-                display_size="$((file_size / 1024)) KB"
+                display_size="$((file_size / KB)) KB"
                 
-            elif [ "$file_size" -lt 1024 * 1024 * 1024 ]; then #Caso seja menor que 1GB:
+            elif [ "$file_size" -lt "$GB" ]; then #Caso seja menor que 1GB:
             
-                display_size="$((file_size / 1024 / 1024)) MB"
+                display_size="$((file_size / MB)) MB"
                 
             else #Caso seja maior ou igual a 1GB:
             
-                display_size="$((file_size / 1024 / 1024 / 1024)) GB"
+                display_size="$((file_size / GB)) GB"
             fi
             
             printf "%-15s: %s\n" "Size" "$display_size"
@@ -797,21 +839,21 @@ list_detailed_view() {
     local display_total_size
     
     # Verifica o tamanho total e formata apropriadamente
-    if [ "$total_size" -lt 1024 ]; then #Caso seja menor que 1KB:
+    if [ "$total_size" -lt "$KB" ]; then #Caso seja menor que 1KB:
     
         display_total_size="${total_size} bytes"
         
-    elif [ "$total_size" -lt 1024 * 1024 ]; then #Caso seja menor que 1MB:
+    elif [ "$total_size" -lt "$MB" ]; then #Caso seja menor que 1MB:
     
-        display_total_size="$((total_size / 1024)) KB"
+        display_total_size="$((total_size / KB)) KB"
         
-    elif [ "$total_size" -lt 1024 * 1024 * 1024 ]; then #Caso seja menor que 1GB:
+    elif [ "$total_size" -lt "$GB" ]; then #Caso seja menor que 1GB:
     
-        display_total_size="$((total_size / 1024 / 1024)) MB"
+        display_total_size="$((total_size / MB)) MB"
         
     else #Caso seja maior ou igual a 1GB:
     
-        display_total_size="$((total_size / 1024 / 1024 / 1024)) GB"
+        display_total_size="$((total_size / GB)) GB"
     fi
     
     #Mostra o armazenamento total usado
@@ -825,17 +867,17 @@ list_detailed_view() {
         local display_avg_size
         
         #Formata o tamanho médio para display
-        if [ "$avg_size" -lt 1024 ]; then #Caso seja menor que 1KB:
+        if [ "$avg_size" -lt "$KB" ]; then #Caso seja menor que 1KB:
         
             display_avg_size="${avg_size} bytes"
             
-        elif [ "$avg_size" -lt 1024 * 1024 ]; then #Caso seja menor que 1MB:
+        elif [ "$avg_size" -lt "$MB" ]; then #Caso seja menor que 1MB:
         
-            display_avg_size="$((avg_size / 1024)) KB"
+            display_avg_size="$((avg_size / KB)) KB"
             
         else #Caso seja maior ou igual a 1MB:
         
-            display_avg_size="$((avg_size / 1024 / 1024)) MB"
+            display_avg_size="$((avg_size / MB)) MB"
         fi
         
         #Mostra o tamanho médio de um item
@@ -852,7 +894,7 @@ list_detailed_view() {
 #   $1 - "--force" to skip confirmation
 # Returns: 0 on success, 1 on failure
 #################################################
-empty_recyclebin() {
+empty_recyclebin(){
 
     #Argumento passado pelo user que permite identificar se está ou não em force_mode
     local target="$1"
@@ -867,7 +909,8 @@ empty_recyclebin() {
     fi
 
     #Verifica se o recycle bin está vazio 
-    local line_count=$(wc -l < "$METADATA_FILE" || echo 0) #Conta o nº de linhas de METADATA_FILE
+    local line_count
+    line_count=$(wc -l < "$METADATA_FILE" || echo 0) #Conta o nº de linhas de METADATA_FILE
 
     if [ ! -f "$METADATA_FILE" ] || [ "$line_count" -le 1 ]; then #Caso o ficheiro de metadata não exista ou tenha 1 ou menos linhas:
 
@@ -912,7 +955,7 @@ empty_recyclebin() {
     if [ -d "$FILES_DIR" ] && [ "$(ls -A "$FILES_DIR")" ]; then #Caso o diretório de ficheiros exista e não esteja vazio:
 
         #Tenta eliminar todos os ficheiros do diretório
-        if rm -rf "$FILES_DIR"/*; then #Caso o comando seja bem sucedido:
+        if rm -rf "${FILES_DIR:?}"/*; then #Caso o comando seja bem sucedido:
 
             #Mensagem a confirmar que todos os ficheiros foram eliminados
             echo "All files deleted from recycle bin"
@@ -967,7 +1010,7 @@ empty_recyclebin() {
 #   $2 - force mode (0=ask confirmation, 1=skip confirmation)
 # Returns: 0 on success, 1 on failure
 #################################################
-empty_specific_file() {
+empty_specific_file(){
 
     #ID do file a eliminar
     local file_id="$1"
@@ -984,7 +1027,8 @@ empty_specific_file() {
     fi
 
     #Procura o ficheiro no metadata por id
-    local entry=$(grep "^$file_id," "$METADATA_FILE")
+    local entry
+    entry=$(grep "^$file_id," "$METADATA_FILE")
 
     if [ -z "$entry" ]; then #Caso a entrada não seja encontrada:
 
@@ -1027,7 +1071,7 @@ empty_specific_file() {
     if [ -e "$FILES_DIR/$file_id" ]; then #Caso o ficheiro exista no diretório de ficheiros:
 
         #Tenta eliminar o ficheiro
-        if rm -rf "$FILES_DIR/$file_id"; then #Caso o comando seja bem sucedido:
+        if rm -rf "${FILES_DIR:?}/$file_id"; then #Caso o comando seja bem sucedido:
 
             #Mensagem a confirmar que o ficheiro foi eliminado permanentemente
             echo "File '$original_name' permanently deleted"
@@ -1077,15 +1121,14 @@ empty_specific_file() {
 # Parameters: $1 - search pattern
 # Returns: 0 on success
 #################################################
-search_recycled() {
+search_recycled(){
     local pattern="$1"
 
     #Verifica se foi especificado um padrão de pesquisa
     if [ -z "$pattern" ]; then #Caso o pattern esteja vazio:
 
         #Mensagem de erro a informar a falta de padrão de pesquisa
-        echo "Error: No search pattern specified"
-        echo "Usage: search <filename|ID|path|wildcard>"
+        echo -e "${RED}Error: No search pattern specified"
 
         return 1
     fi
@@ -1094,7 +1137,7 @@ search_recycled() {
     if [ ! -f "$METADATA_FILE" ] || [ ! -s "$METADATA_FILE" ]; then #Caso o ficheiro de metadata não exista ou esteja vazio:
 
         #Mensagem a informar que o recycle bin está vazio
-        echo "Recycle bin is empty"
+        echo -e "${RED}Recycle bin is empty"
 
         return 0
     fi
@@ -1106,25 +1149,25 @@ search_recycled() {
 
         #Define o tipo de pesquisa como ID
         search_by="id"
-        echo "Searching by ID: $pattern"
+        echo -e "${YELLOW}Searching by ID: $pattern"
 
     elif [[ "$pattern" == *[\*\?]* ]]; then #Caso o pattern contenha wildcards:
 
         #Define o tipo de pesquisa como wildcard
         search_by="wildcard"
-        echo "Searching with wildcards: $pattern"
+        echo -e "${YELLOW}Searching with wildcards: $pattern"
 
     elif [[ "$pattern" == */* ]]; then #Caso o pattern seja um caminho:
 
         #Define o tipo de pesquisa como path
         search_by="path"
-        echo "Searching by path: $pattern"
+        echo -e "${YELLOW}Searching by path: $pattern"
 
     else #Caso não seja nenhum dos tipos anteriores:
 
         #Define o tipo de pesquisa como filename
         search_by="filename"
-        echo "Searching by filename: $pattern"
+        echo -e "${YELLOW}Searching by filename: $pattern"
     fi
 
     #Mostra cabeçalho da pesquisa
@@ -1162,7 +1205,7 @@ search_recycled() {
             #Converte wildcards para formato grep
             local grep_pattern=$(echo "$pattern" | sed 's/\./\\./g' | sed 's/\*/.*/g' | sed 's/\?/./g')
             
-            #Pesquisa com wildcards
+            #Pesquisa com wildcards/Mostra todas as linhas do ficheiro a partir da linha 2 que correspondam ao padrão
             while IFS=',' read -r id original_name original_path deletion_date file_size file_type permissions owner; do
 
                 #Verifica se o original name corresponde ao serach pattern
@@ -1173,45 +1216,27 @@ search_recycled() {
                     match_count=$((match_count + 1)) #Contador de nº de ficheiros encontrados no recycle bin
                 fi
 
-
-            #Mostra todas as linhas do ficheiro a partir da linha 2 que correspondam ao padrão
-            done < <(grep -i "$grep_pattern" "$METADATA_FILE" | tail -n +2)
+                done < <(grep -i "$grep_pattern" "$METADATA_FILE" | tail -n +2)   
             ;;
 
         "path")
-
-            #Pesquisa por caminho
+            # Pesquisa por caminho
             while IFS=',' read -r id original_name original_path deletion_date file_size file_type permissions owner; do
-
-                #Verifica se o original path corresponde ao serach pattern
-                if echo "$original_path" | grep -qi "$pattern"; then #Caso o caminho corresponda:
-
-                    # Mostra o resultado
+                if echo "$original_path" | grep -qi "$pattern"; then
                     show_search_result "$id" "$original_name" "$deletion_date" "$file_size"
-                    match_count=$((match_count + 1)) #Contador de nº de ficheiros encontrados no recycle bin
-
+                    match_count=$((match_count + 1))
                 fi
-
-            #Mostra todas as linhas do ficheiro a partir da linha 2 que correspondam ao padrão
             done < <(grep -i "$pattern" "$METADATA_FILE" | tail -n +2)
             ;;
 
         "filename")
-
             # Pesquisa por nome do ficheiro
             while IFS=',' read -r id original_name original_path deletion_date file_size file_type permissions owner; do
-                
-                #Verifica se o original name corresponde ao serach pattern
-                if echo "$original_name" | grep -qi "$pattern"; then #Caso o nome corresponda:
-
-                    # Mostra o resultado
+                if [[ "${original_name,,}" == *"${pattern,,}"* ]]; then
                     show_search_result "$id" "$original_name" "$deletion_date" "$file_size"
-                    match_count=$((match_count + 1)) #Contador de nº de ficheiros encontrados no recycle bin
-
+                    match_count=$((match_count + 1))
                 fi
-
-            #Mostra todas as linhas do ficheiro a partir da linha 2 que correspondam ao padrão
-            done < <(grep -i "$pattern" "$METADATA_FILE" | tail -n +2)
+            done < <(tail -n +2 "$METADATA_FILE")
             ;;
     esac
 
@@ -1220,12 +1245,12 @@ search_recycled() {
     if [ "$match_count" -eq 0 ]; then #Caso não tenham sido encontrados resultados:
 
         # Mensagem a informar que não foram encontrados resultados
-        echo "${RED}No matches found for: '$pattern ${NC}'"
+        echo -e "${RED}No matches found for: '$pattern ${NC}'"
 
     else #Caso tenham sido encontrados resultados:
 
         # Mensagem com o número de resultados encontrados
-        echo "${GREEN}Found $match_count match(es)"
+        echo -e "${GREEN}Found $match_count match(es)"
 
     fi
 
@@ -1238,12 +1263,17 @@ search_recycled() {
 # Parameters: $1 - ID, $2 - filename, $3 - deletion date, $4 - file size
 # Returns: 0 on success
 #################################################
-show_search_result() {
+show_search_result(){
 
     local id="$1" #ID
     local original_name="$2" #filename
     local deletion_date="$3" #deletion date
     local file_size="$4" #file size
+
+    #Size
+    local KB=1024
+    local MB=$((1024 * 1024))
+    local GB=$((1024 * 1024 * 1024))
 
     #Formata valores para display
     local display_id="${id:0:10}..."
@@ -1253,20 +1283,25 @@ show_search_result() {
     local display_date="${deletion_date:0:16}"
     
     local display_size
-    if [ "$file_size" -lt 1024 ]; then #Caso o tamanho seja menor que 1KB:
+    if [ "$file_size" -lt "$KB" ]; then #Caso o tamanho seja menor que 1KB:
     
         #Mostra o tamanho em bytes
         display_size="${file_size}B"
         
-    elif [ "$file_size" -lt 1048576 ]; then #Caso o tamanho seja menor que 1MB:
+    elif [ "$file_size" -lt "$MB" ]; then #Caso o tamanho seja menor que 1MB:
     
         #Converte para KB e mostra
-        display_size="$((file_size / 1024))KB"
+        display_size="$((file_size / KB))KB"
         
-    else #Caso o tamanho seja maior ou igual a 1MB:
+    elif [ "$file_size" -lt "$GB" ]; then #Caso o tamanho seja menor que 1GB:
     
         #Converte para MB e mostra
-        display_size="$((file_size / 1048576))MB"
+        display_size="$((file_size / MB))MB"
+        
+    else #Caso o tamanho seja maior ou igual a 1GB:
+    
+        #Converte para GB e mostra
+        display_size="$((file_size / GB))GB"
     fi
 
     #Mostra a linha formatada da tabela
@@ -1280,7 +1315,7 @@ show_search_result() {
 # Parameters: None
 # Returns: 0
 #################################################
-display_help() {
+display_help(){
     #Mostra o menu de ajuda formatado com cores
     cat << EOF
 Linux Recycle Bin - Usage Guide
@@ -1289,15 +1324,15 @@ SYNOPSIS:
     $0 [OPTION] [ARGUMENTS]
 
 OPTIONS:
-    delete <file>       Move file/directory to recycle bin
-    list                List all items in recycle bin
-    list --detailed     List with detailed information
-    restore <id>        Restore file by ID
-    search <pattern>    Search for files by name, path or wildcard
-    empty               Empty recycle bin permanently
-    empty <id>          Delete specific file by ID
-    empty --force       Empty without confirmation
-    help                Display this help message
+    delete <file>                   Move file/directory to recycle bin
+    list                            List all items in recycle bin
+    list --detailed                 List with detailed information
+    restore <id || filename>        Restore file by ID
+    search <pattern>                Search for files by name, path or wildcard
+    empty                           Empty recycle bin permanently
+    empty <id>                      Delete specific file by ID
+    empty --force                   Empty without confirmation
+    help                            Display this help message
 
 EXAMPLES:
     $0 delete myfile.txt
@@ -1320,8 +1355,7 @@ EOF
 # Parameters: Command line arguments
 # Returns: Exit code
 #################################################
-main() {
-    #Inicializa o recycle bin
+main(){
     initialize_recyclebin
 
     #Processa os argumentos da linha de comandos
@@ -1354,6 +1388,7 @@ main() {
         help|--help|-h)
             display_help
             ;;
+
         *)
             #Mensagem de erro para opção inválida
             echo "Invalid option. Use 'help' for usage information."
