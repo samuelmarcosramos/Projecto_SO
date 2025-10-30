@@ -9,7 +9,7 @@ Nº Mecanográfico: 124955
 
 ## Installation
 --> 1. Descarregar o script:
-        -git clone (https://github.com/samuelmarcosramos/Projecto_SO.git) "\n"
+        -git clone (https://github.com/samuelmarcosramos/Projecto_SO.git).
         -cd StudentName_RecycleBin
 
 --> 2. Tornar o script executável:
